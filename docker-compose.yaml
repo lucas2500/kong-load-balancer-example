@@ -1,0 +1,118 @@
+version: '3.9'
+
+networks:
+  kong-net:
+    external: true
+
+services:
+
+  kong-database:
+    image: postgres:9.6
+    container_name: kong-database
+    restart: always
+    environment:
+      POSTGRES_USER: kong
+      POSTGRES_DB: kong
+      POSTGRES_PASSWORD: kongpass
+    networks:
+      - kong-net
+    ports:
+      - "5432:5432"
+
+  kong-migration:
+    image: kong/kong-gateway:3.1.1.3
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_PASSWORD: kongpass
+      KONG_PASSWORD: test
+    networks:
+      - kong-net
+    depends_on:
+      - kong-database
+    command: kong migrations bootstrap
+
+  kong-gateway:
+    image: kong/kong-gateway:3.1.1.3
+    container_name: kong-gateway
+    restart: always
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kongpass
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_ADMIN_GUI_URL: http://localhost:8002
+    networks:
+      - kong-net
+    depends_on:
+      - kong-database
+    ports:
+      - "8000:8000"
+      - "8443:8443"
+      - "8001:8001"
+      - "8444:8444"
+      - "8002:8002"
+      - "8445:8445"
+      - "8003:8003"
+      - "8004:8004"
+
+  konga:
+    image: pantsel/konga
+    container_name: konga
+    restart: always
+    environment:
+      TOKEN_SECRET: my_secret
+      DB_ADAPTER: postgres
+      DB_HOST: kong-database
+      DB_USER: kong
+      DB_PASSWORD: kongpass
+      DB_DATABASE: konga_database
+      NODE_ENV: development
+    networks:
+      - kong-net
+    depends_on:
+      - kong-database
+    ports:
+      - "1337:1337"
+
+  node-api0:
+    image: lucas2500/node-express-api
+    container_name: node-express-api-0
+    restart: always
+    networks:
+      - kong-net
+    environment:
+      - PORT=3000
+      - APPLICATION_NODE=A
+    ports:
+      - "3000:3000"
+    build: .
+
+  node-api1:
+    image: lucas2500/node-express-api
+    container_name: node-express-api-1
+    restart: always
+    networks:
+      - kong-net
+    environment:
+      - PORT=3001
+      - APPLICATION_NODE=B
+    ports:
+      - "3001:3001"
+      
+  node-api2:
+    image: lucas2500/node-express-api
+    container_name: node-express-api-2
+    restart: always
+    networks:
+      - kong-net
+    environment:
+      - PORT=3002
+      - APPLICATION_NODE=C
+    ports:
+      - "3002:3002"
